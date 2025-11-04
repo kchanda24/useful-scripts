@@ -1,0 +1,57 @@
+# ------------------------------
+# Install NGINX on Windows EC2
+# ------------------------------
+Write-Host "Downloading NGINX..." -ForegroundColor Cyan
+
+$nginxUrl = "https://nginx.org/download/nginx-1.26.0.zip"
+$nginxZip = "C:\nginx.zip"
+$nginxDir = "C:\nginx"
+
+Invoke-WebRequest -UseBasicParsing -Uri $nginxUrl -OutFile $nginxZip
+
+Write-Host "Extracting NGINX..." -ForegroundColor Cyan
+Expand-Archive $nginxZip -DestinationPath $nginxDir
+
+$nginxPath = (Get-ChildItem $nginxDir | Select-Object -First 1).FullName
+Set-Location $nginxPath
+
+Write-Host "Starting NGINX..." -ForegroundColor Green
+start nginx
+
+# ------------------------------
+# Allow Firewall port 80 + 443
+# ------------------------------
+Write-Host "Configuring Windows Firewall..." -ForegroundColor Cyan
+New-NetFirewallRule -DisplayName "NGINX HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow >$null
+New-NetFirewallRule -DisplayName "NGINX HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow >$null
+
+Write-Host "NGINX installation complete!" -ForegroundColor Green
+Write-Host "Go to http://<Your-EC2-Public-IP> to test." -ForegroundColor Yellow
+
+
+# ------------------------------
+# OPTIONAL: Install NSSM and run NGINX as a Windows Service
+# Comment out if you don't want service setup
+# ------------------------------
+Write-Host "`nInstalling NSSM to run NGINX as a Windows service..." -ForegroundColor Cyan
+
+$nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
+$nssmZip = "C:\nssm.zip"
+$nssmDir = "C:\nssm"
+
+Invoke-WebRequest -UseBasicParsing -Uri $nssmUrl -OutFile $nssmZip
+Expand-Archive $nssmZip -DestinationPath $nssmDir
+
+$nssmExe = "C:\nssm\nssm-2.24\win64\nssm.exe"
+
+Write-Host "Registering NGINX as a service..." -ForegroundColor Cyan
+& $nssmExe install nginx "$nginxPath\nginx.exe"
+
+Start-Service nginx
+Set-Service nginx -StartupType Automatic
+
+Write-Host "NGINX service created and started!" -ForegroundColor Green
+Write-Host "To stop manually: Stop-Service nginx" -ForegroundColor Yellow
+
+
+openssl req -x509 -nodes -newkey rsa:2048 -keyout C:\nginx\cert\localhost.key -out C:\nginx\cert\localhost.crt -days 365
